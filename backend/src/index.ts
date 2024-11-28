@@ -1,13 +1,15 @@
 require("dotenv").config();
 import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
-import { BASE_PROMPT } from "./prompts";
+import { BASE_PROMPT, getSystemPrompt } from "./prompts";
 import { TextBlock } from "@anthropic-ai/sdk/resources";
 import { basePrompt as nodeBasePrompt } from "./defaults/node";
 import { basePrompt as reactBasePrompt } from "./defaults/react";
+import cors from "cors";
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 const anthropic = new Anthropic();
 
@@ -55,17 +57,20 @@ app.post("/template", async (req, res) => {
     return;
 });
 
-async function main() {
-    anthropic.messages
-        .stream({
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 1024,
-            messages: [{ role: "user", content: "What is 2 + 2" }],
-            temperature: 0,
-        })
-        .on("text", (text) => {
-            console.log(text);
-        });
-}
+app.post("/chat", async (req, res) => {
+    const messages = req.body.messages;
+    const response = await anthropic.messages.create({
+        messages: messages,
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 8000,
+        system: getSystemPrompt(),
+    });
 
-main();
+    console.log(response);
+
+    res.json({
+        response: (response.content[0] as TextBlock)?.text,
+    });
+});
+
+app.listen(3000, () => console.log("Server running on port: 3000"));
